@@ -28,8 +28,14 @@ html = f"""
 
 @app.get("/")
 async def root():
-    return HTMLResponse(html)
+    return {'res': 'root', 'version': __version__, "time": time()}
+    #return HTMLResponse(html)
 
 @app.get('/ping')
 async def hello():
     return {'res': 'pong', 'version': __version__, "time": time()}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8001)

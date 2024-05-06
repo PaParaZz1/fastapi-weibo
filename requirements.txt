@@ -1,1 +1,4 @@
-fastapi
+anyio==3.6.2
+httpx==0.24.0
+uvicorn[standard]==0.22.0
+fastapi==0.95.2

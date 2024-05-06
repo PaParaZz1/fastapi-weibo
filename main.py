@@ -2,9 +2,12 @@ from time import time
 from fastapi import FastAPI, __version__
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
+import logging
 
+logging.info('start 1')
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
+logging.info('start 2')
 
 html = f"""
 <!DOCTYPE html>
@@ -28,6 +31,7 @@ html = f"""
 
 @app.get("/")
 async def root():
+    logging.info('root 1')
     return {'res': 'root', 'version': __version__, "time": time()}
     #return HTMLResponse(html)
 

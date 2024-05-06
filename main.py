@@ -30,13 +30,13 @@ html = f"""
 """
 
 @app.get("/")
-async def root():
+def root():
     logging.info('root 1')
     return {'res': 'root', 'version': __version__, "time": time()}
     #return HTMLResponse(html)
 
 @app.get('/ping')
-async def hello():
+def hello():
     return {'res': 'pong', 'version': __version__, "time": time()}
 
 

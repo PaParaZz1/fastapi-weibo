@@ -45,7 +45,7 @@ async def hello():
     return {'res': 'pong', 'version': __version__, "time": time()}
 
 
-async def fake_comment(cid: str, sid: str):
+def fake_comment(cid: str, sid: str):
     # url = "https://api.weibo.com/2/comments/create.json"
     url = "https://api.weibo.com/2/comments/reply.json"
     data = {

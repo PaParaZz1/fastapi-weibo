@@ -6,7 +6,7 @@ import os
 import logging
 import hashlib
 
-logging.setLevel(logging.INFO)
+logging.getLogger().setLevel(logging.INFO)
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 token = os.getenv("WEIBO_TOKEN")

@@ -48,18 +48,42 @@ async def check(request: Request) -> bool:
     # application/x-www-form-urlencoded
     # body = await request.body()
     form = await request.form()
-    nonce = form.get("nonce")
     timestamp = form.get("timestamp")
-    echostr = form.get("echostr")
     signature = form.get("signature")
-    logging.info(f"nonce: {nonce}, timestamp: {timestamp}, echostr: {echostr}, signature: {signature}")
-    cat_string = ''.join(sorted([timestamp, nonce, token]))
-    if hashlib.sha1(cat_string.encode()).hexdigest() == signature:
-        logging.info(f"check success, echostr: {echostr}")
-        return Response(content=echostr)
-    else:
-        logging.error("check failed")
-        return Response(content='', status_code=403)
+    echostr = form.get("echostr")
+    if echostr is None:  # normal request
+        event_type = form.get("event")  # add, repost, del
+        content_type = form.get("content_type")  # status, comment
+        content_body = form.get("content_body")
+        logging.info(f"event: {event_type}, content_type: {content_type}, content_body: {content_body}, type: {type(content_body)}")
+        weiboid = content_body.get("id")
+        text = content_body.get("text")
+        created_at = content_body.get("created_at")
+        uid = content_body.get("user").get("id")
+        screen_name = content_body.get("user").get("screen_name")
+        if content_type == "status":
+            has_image = content_body.get("has_image")
+            if has_image:
+                images = content_body.get("images")
+                logging.info(f"[status] uid: {uid}, screen_name: {screen_name}, text: {text}, images: {images}")
+            else:
+                logging.info(f"[status] uid: {uid}, screen_name: {screen_name}, text: {text}")
+        elif content_type == "comment":
+            status_id = content_body.get("status").get("id")
+            status_text = content_body.get("status").get("text")
+            logging.info(f"[comment] uid: {uid}, screen_name: {screen_name}, text: {text}, status_id: {status_id}, status_text: {status_text}")
+
+        return Response(content="ok")
+    else:  # validation request
+        nonce = form.get("nonce")
+        logging.info(f"nonce: {nonce}, timestamp: {timestamp}, echostr: {echostr}, signature: {signature}")
+        cat_string = ''.join(sorted([timestamp, nonce, token]))
+        if hashlib.sha1(cat_string.encode()).hexdigest() == signature:
+            logging.info(f"check success, echostr: {echostr}")
+            return Response(content=echostr)
+        else:
+            logging.error("check failed")
+            return Response(content='', status_code=403)
 
 
 if __name__ == "__main__":

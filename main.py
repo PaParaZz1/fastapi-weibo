@@ -1,7 +1,7 @@
 from time import time
 from fastapi import FastAPI, Request, __version__
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, Response, JsonResponse
+from fastapi.responses import HTMLResponse, Response, JSONResponse
 import os
 import json
 import logging
@@ -75,7 +75,7 @@ async def check(request: Request) -> bool:
             status_text = content_body.get("status").get("text")
             logging.info(f"[comment] uid: {uid}, screen_name: {screen_name}, text: {text}, status_id: {status_id}, status_text: {status_text}")
 
-        return JsonResponse({"result": True, "pull_later": False, "message": ""})
+        return JSONResponse({"result": True, "pull_later": False, "message": ""})
     else:  # validation request
         nonce = form.get("nonce")
         logging.info(f"nonce: {nonce}, timestamp: {timestamp}, echostr: {echostr}, signature: {signature}")

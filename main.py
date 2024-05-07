@@ -2,12 +2,13 @@ from time import time
 from fastapi import FastAPI, __version__
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
+import os
 import logging
+import hashlib
 
-logging.info('start 1')
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
-logging.info('start 2')
+token = os.getenv("WEIBO_TOKEN")
 
 html = f"""
 <!DOCTYPE html>
@@ -29,15 +30,26 @@ html = f"""
 </html>
 """
 
+
 @app.get("/")
 def root():
-    logging.info('root 1')
-    return {'res': 'root', 'version': __version__, "time": time()}
-    #return HTMLResponse(html)
+    return HTMLResponse(html)
+
 
 @app.get('/ping')
 def hello():
     return {'res': 'pong', 'version': __version__, "time": time()}
+
+
+@app.post('/check')
+def check(nonce: str, timestamp: str, echostr: str, signature: str) -> str:
+    logging.info(f"nonce: {nonce}, timestamp: {timestamp}, echostr: {echostr}, signature: {signature}")
+    cat_string = ''.join(sorted([timestamp, nonce, token]))
+    if hashlib.sha1(cat_string.encode()).hexdigest() == signature:
+        logging.info("check success")
+    else:
+        logging.error("check failed")
+    return echostr
 
 
 if __name__ == "__main__":

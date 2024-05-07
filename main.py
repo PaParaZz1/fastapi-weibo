@@ -55,7 +55,9 @@ async def check(request: Request) -> bool:
         event_type = form.get("event")  # add, repost, del
         content_type = form.get("content_type")  # status, comment
         content_body = form.get("content_body")
+        content_body = json.loads(content_body)
         logging.info(f"event: {event_type}, content_type: {content_type}, content_body: {content_body}, type: {type(content_body)}")
+
         weiboid = content_body.get("id")
         text = content_body.get("text")
         created_at = content_body.get("created_at")
@@ -73,7 +75,7 @@ async def check(request: Request) -> bool:
             status_text = content_body.get("status").get("text")
             logging.info(f"[comment] uid: {uid}, screen_name: {screen_name}, text: {text}, status_id: {status_id}, status_text: {status_text}")
 
-        return Response(content="ok")
+        return JsonResponse({"result": True, "pull_later": False, "message": ""})
     else:  # validation request
         nonce = form.get("nonce")
         logging.info(f"nonce: {nonce}, timestamp: {timestamp}, echostr: {echostr}, signature: {signature}")

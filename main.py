@@ -1,7 +1,7 @@
 from time import time
-from fastapi import FastAPI, Form, Request, __version__
+from fastapi import FastAPI, Request, __version__
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 import os
 import logging
 import hashlib
@@ -43,7 +43,7 @@ async def hello():
 
 
 @app.post('/check')
-#async def check(request: Request, nonce: str = Form(...), timestamp: str = Form(...), echostr: str = Form(...), signature: str = Form(...)) -> str:
+# async def check(request: Request, nonce: str = Form(...), timestamp: str = Form(...), echostr: str = Form(...), signature: str = Form(...)) -> str:
 async def check(request: Request) -> bool:
     # application/x-www-form-urlencoded
     # body = await request.body()
@@ -56,10 +56,10 @@ async def check(request: Request) -> bool:
     cat_string = ''.join(sorted([timestamp, nonce, token]))
     if hashlib.sha1(cat_string.encode()).hexdigest() == signature:
         logging.info(f"check success, echostr: {echostr}")
-        return True
+        return Response(content=echostr)
     else:
         logging.error("check failed")
-        return False
+        return Response(content='', status_code=403)
 
 
 if __name__ == "__main__":

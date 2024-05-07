@@ -45,6 +45,7 @@ async def hello():
 @app.post('/check')
 #async def check(nonce: str = Query(None), timestamp: str = Query(None), echostr: str = Query(None), signature: str = Query(None)) -> str:
 async def check(request: Request) -> str:
+    logging.info(f"request: {request}")
     request_data = await request.json()
     logging.info(f"request_data: {request_data}")
     content_type = request.headers.get("Content-Type")

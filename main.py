@@ -48,6 +48,9 @@ async def hello():
 def fake_comment(cid: str, sid: str):
     # url = "https://api.weibo.com/2/comments/create.json"
     url = "https://api.weibo.com/2/comments/reply.json"
+    headers = {
+      "Content-Type": "application/json",
+    }
     data = {
         "access_token": access_token,
         "cid": cid,
@@ -55,8 +58,9 @@ def fake_comment(cid: str, sid: str):
         "comment": "已收到评论，飞速运转中...",
     }
     logging.info(f"fake_comment: {data} cid: {cid}, sid: {sid}")
-    res = requests.post(url, data=data)
+    res = requests.post(url, json=data, headers=headers)
     logging.info(f"fake_comment: {res}")
+    logging.info(f"text: {res.text}")
 
 
 @app.post('/check')

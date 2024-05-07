@@ -1,7 +1,7 @@
 from time import time
 from fastapi import FastAPI, Request, __version__
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, Response, JsonResponse
 import os
 import json
 import logging
@@ -57,7 +57,6 @@ async def check(request: Request) -> bool:
         content_type = form.get("content_type")  # status, comment
         content_body = form.get("content_body")
         content_body = json.loads(content_body)
-        logging.info(f"event: {event_type}, content_type: {content_type}, content_body: {content_body}, type: {type(content_body)}")
 
         weiboid = content_body.get("id")
         text = content_body.get("text")

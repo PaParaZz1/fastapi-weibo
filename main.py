@@ -1,5 +1,5 @@
 from time import time
-from fastapi import FastAPI, Query, __version__
+from fastapi import FastAPI, Query, Request, __version__
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 import os

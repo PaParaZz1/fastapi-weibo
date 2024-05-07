@@ -6,11 +6,13 @@ import os
 import json
 import logging
 import hashlib
+import requests
 
 logging.getLogger().setLevel(logging.INFO)
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 token = os.getenv("WEIBO_TOKEN")
+access_token = os.getenv("WEIBO_ACCESS_TOKEN")
 
 html = f"""
 <!DOCTYPE html>
@@ -43,6 +45,20 @@ async def hello():
     return {'res': 'pong', 'version': __version__, "time": time()}
 
 
+async def fake_comment(cid: str, sid: str):
+    # url = "https://api.weibo.com/2/comments/create.json"
+    url = "https://api.weibo.com/2/comments/reply.json"
+    data = {
+        "access_token": access_token,
+        "cid": cid,
+        "id": sid,
+        "comment": "已收到评论，飞速运转中...",
+    }
+    logging.info(f"fake_comment: {data} cid: {cid}, sid: {sid}")
+    res = requests.post(url, data=data)
+    logging.info(f"fake_comment: {res}")
+
+
 @app.post('/check')
 # async def check(request: Request, nonce: str = Form(...), timestamp: str = Form(...), echostr: str = Form(...), signature: str = Form(...)) -> str:
 async def check(request: Request) -> bool:
@@ -58,7 +74,7 @@ async def check(request: Request) -> bool:
         content_body = form.get("content_body")
         content_body = json.loads(content_body)
 
-        weiboid = content_body.get("id")
+        id_ = content_body.get("id")
         text = content_body.get("text")
         created_at = content_body.get("created_at")
         uid = content_body.get("user").get("id")
@@ -74,6 +90,7 @@ async def check(request: Request) -> bool:
             status_id = content_body.get("status").get("id")
             status_text = content_body.get("status").get("text")
             logging.info(f"[comment] uid: {uid}, screen_name: {screen_name}, text: {text}, status_id: {status_id}, status_text: {status_text}")
+            fake_comment(cid=id_, sid=status_id)
 
         return JSONResponse({"result": True, "pull_later": False, "message": ""})
     else:  # validation request

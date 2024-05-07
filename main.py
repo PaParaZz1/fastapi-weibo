@@ -43,7 +43,16 @@ async def hello():
 
 
 @app.post('/check')
-async def check(nonce: str = Query(None), timestamp: str = Query(None), echostr: str = Query(None), signature: str = Query(None)) -> str:
+#async def check(nonce: str = Query(None), timestamp: str = Query(None), echostr: str = Query(None), signature: str = Query(None)) -> str:
+async def check(request: Request) -> str:
+    request_data = await request.json()
+    logging.info(f"request_data: {request_data}")
+    content_type = request.headers.get("Content-Type")
+    logging.info(f"content_type: {content_type} headers: {request.headers}")
+    nonce = await request.form("nonce")
+    timestamp = await request.form("timestamp")
+    echostr = await request.form("echostr")
+    signature = await request.form("signature")
     logging.info(f"nonce: {nonce}, timestamp: {timestamp}, echostr: {echostr}, signature: {signature}")
     cat_string = ''.join(sorted([timestamp, nonce, token]))
     if hashlib.sha1(cat_string.encode()).hexdigest() == signature:

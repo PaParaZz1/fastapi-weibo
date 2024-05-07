@@ -44,25 +44,22 @@ async def hello():
 
 @app.post('/check')
 #async def check(request: Request, nonce: str = Form(...), timestamp: str = Form(...), echostr: str = Form(...), signature: str = Form(...)) -> str:
-async def check(request: Request) -> str:
+async def check(request: Request) -> bool:
     # application/x-www-form-urlencoded
-    logging.info(f"request: {request}")
-    body = await request.body()
-    logging.info(f"body: {body}, type: {type(body)}")
+    # body = await request.body()
     form = await request.form()
-    logging.info(f"form: {form}, type: {type(form)}")
     nonce = form.get("nonce")
     timestamp = form.get("timestamp")
     echostr = form.get("echostr")
     signature = form.get("signature")
-    content_type = request.headers.get("Content-Type")
     logging.info(f"nonce: {nonce}, timestamp: {timestamp}, echostr: {echostr}, signature: {signature}")
     cat_string = ''.join(sorted([timestamp, nonce, token]))
     if hashlib.sha1(cat_string.encode()).hexdigest() == signature:
-        logging.info("check success")
+        logging.info(f"check success, echostr: {echostr}")
+        return True
     else:
         logging.error("check failed")
-    return echostr
+        return False
 
 
 if __name__ == "__main__":

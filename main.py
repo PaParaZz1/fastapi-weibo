@@ -1,4 +1,4 @@
-from time import time
+from threading import Thread
 from fastapi import FastAPI, Request, __version__
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, Response, JSONResponse
@@ -13,7 +13,6 @@ logging.getLogger().setLevel(logging.INFO)
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 token = os.getenv("WEIBO_TOKEN")
-access_token = os.getenv("WEIBO_ACCESS_TOKEN")
 
 html = f"""
 <!DOCTYPE html>
@@ -43,38 +42,79 @@ async def root():
 
 @app.get('/ping')
 async def hello():
-    return {'res': 'pong', 'version': __version__, "time": time()}
+    return {'res': 'pong', 'version': __version__, "time": time.time()}
 
 
-def comment_reply(cid: str, sid: str, rip: str, text: str = None):
-    if text is None:
-        text = "已收到评论，飞速运转中..." + str(time.ctime())
-    url = "https://api.weibo.com/2/comments/reply.json"
-    data = {
-        "access_token": access_token,
-        "cid": cid,
-        "id": sid,
-        "comment": text,
-        "rip": rip,
-    }
-    logging.info(f"comment_reply: {data}")
-    res = requests.post(url, data=data)
-    logging.info(f"text: {res.text}")
+class WeiboClient:
+    def __init__(self):
+        self.access_token = os.getenv("WEIBO_ACCESS_TOKEN")
+        if self.access_token is None:
+            self.last_update_time = 0
+            self.update_token_thread = Thread(target=self.update_token, daemon=True)
+            self.update_token_thread.start()
+
+    def update_token(self):
+        logging.info("update token thread start")
+        app_key = os.getenv('APP_KEY')
+        app_secret = os.getenv('APP_SECRET')
+        uid = os.getenv('DEV_UID')
+        assert app_key is not None
+        assert app_secret is not None
+        assert uid is not None
+        md5_hash = hashlib.md5()
+
+        while True:
+            if time.time() - self.last_update_time >= 4800:
+                current_time_sec = time.time()
+                timestamp = str(int(round(current_time_sec * 1000)))
+                data = {
+                    'client_id': app_key,
+                    'timestamp': timestamp,
+                    'nonce': 'eqiojronqnr',
+                }
+                sign = '&'.join([data['client_id'], uid, data['timestamp'], data['nonce'], app_secret])
+                md5_hash.update(sign.encode())
+                data['sign'] = md5_hash.hexdigest()
+                logging.info(f'update_token: {data}, uid: {uid}')
+                url = 'https://api.weibo.com/oauth2/vp/authorize?client_id=' + data['client_id'] + '&timestamp=' + data['timestamp'] + '&nonce=' + data['nonce'] + '&sign=' + data['sign']
+                response = requests.get(url)
+                data = response.json()
+                self.access_token = data.get("access_token")
+                self.last_update_time = time.time()
+                logging.info("update token success")
+            time.sleep(10)
+
+    def comment_reply(self, cid: str, sid: str, rip: str, text: str = None):
+        if text is None:
+            text = "已收到评论，飞速运转中..." + str(time.ctime())
+        url = "https://api.weibo.com/2/comments/reply.json"
+        data = {
+            "access_token": self.access_token,
+            "cid": cid,
+            "id": sid,
+            "comment": text,
+            "rip": rip,
+        }
+        logging.info(f"comment_reply: {data}")
+        res = requests.post(url, data=data)
+        logging.info(f"text: {res.text}")
+
+    def comment_create(self, sid: str, rip: str, text: str = None):
+        if text is None:
+            text = "已收到at微博，飞速运转中..." + str(time.ctime())
+        url = "https://api.weibo.com/2/comments/create.json"
+        data = {
+            "access_token": self.access_token,
+            "id": sid,
+            "comment": text,
+            "rip": rip,
+        }
+        logging.info(f"comment_create: {data}")
+        res = requests.post(url, data=data)
+        logging.info(f"text: {res.text}")
 
 
-def comment_create(sid: str, rip: str, text: str = None):
-    if text is None:
-        text = "已收到at微博，飞速运转中..." + str(time.ctime())
-    url = "https://api.weibo.com/2/comments/create.json"
-    data = {
-        "access_token": access_token,
-        "id": sid,
-        "comment": text,
-        "rip": rip,
-    }
-    logging.info(f"comment_create: {data}")
-    res = requests.post(url, data=data)
-    logging.info(f"text: {res.text}")
+weibo_client = WeiboClient()
 
 
 @app.post('/check')
@@ -104,12 +144,12 @@ async def check(request: Request) -> bool:
                 logging.info(f"[status] uid: {uid}, screen_name: {screen_name}, text: {text}, images: {images}")
             else:
                 logging.info(f"[status] uid: {uid}, screen_name: {screen_name}, text: {text}")
-            comment_create(sid=id_, rip=rip)
+            weibo_client.comment_create(sid=id_, rip=rip)
         elif content_type == "comment":
             status_id = content_body.get("status").get("id")
             status_text = content_body.get("status").get("text")
             logging.info(f"[comment] uid: {uid}, screen_name: {screen_name}, text: {text}, status_id: {status_id}, status_text: {status_text}")
-            comment_reply(cid=id_, sid=status_id, rip=rip)
+            weibo_client.comment_reply(cid=id_, sid=status_id, rip=rip)
 
         return JSONResponse({"result": True, "pull_later": False, "message": ""})
     else:  # validation request

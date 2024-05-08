@@ -45,28 +45,38 @@ async def hello():
     return {'res': 'pong', 'version': __version__, "time": time()}
 
 
-def fake_comment(cid: str, sid: str, rip: str):
-    # url = "https://api.weibo.com/2/comments/create.json"
+def comment_reply(cid: str, sid: str, rip: str, text: str = None):
+    if text is None:
+        text = "已收到评论，飞速运转中..." + str(time.ctime())
     url = "https://api.weibo.com/2/comments/reply.json"
-    headers = {
-      #"Content-Type": "application/json",
-      "Content-Type": "multipart/form-data",
-    }
     data = {
         "access_token": access_token,
         "cid": cid,
         "id": sid,
-        "comment": "已收到评论，飞速运转中...",
-        "rip": rip, 
+        "comment": text,
+        "rip": rip,
     }
-    logging.info(f"fake_comment: {data} cid: {cid}, sid: {sid}")
+    logging.info(f"comment_reply: {data}")
     res = requests.post(url, data=data)
-    logging.info(f"fake_comment: {res}")
+    logging.info(f"text: {res.text}")
+
+
+def comment_create(sid: str, rip: str, text: str = None):
+    if text is None:
+        text = "已收到at微博，飞速运转中..." + str(time.ctime())
+    url = "https://api.weibo.com/2/comments/create.json"
+    data = {
+        "access_token": access_token,
+        "id": sid,
+        "comment": text,
+        "rip": rip,
+    }
+    logging.info(f"comment_create: {data}")
+    res = requests.post(url, data=data)
     logging.info(f"text: {res.text}")
 
 
 @app.post('/check')
-# async def check(request: Request, nonce: str = Form(...), timestamp: str = Form(...), echostr: str = Form(...), signature: str = Form(...)) -> str:
 async def check(request: Request) -> bool:
     # application/x-www-form-urlencoded
     # body = await request.body()
@@ -93,11 +103,12 @@ async def check(request: Request) -> bool:
                 logging.info(f"[status] uid: {uid}, screen_name: {screen_name}, text: {text}, images: {images}")
             else:
                 logging.info(f"[status] uid: {uid}, screen_name: {screen_name}, text: {text}")
+            comment_create(sid=id_, rip=rip)
         elif content_type == "comment":
             status_id = content_body.get("status").get("id")
             status_text = content_body.get("status").get("text")
             logging.info(f"[comment] uid: {uid}, screen_name: {screen_name}, text: {text}, status_id: {status_id}, status_text: {status_text}")
-            fake_comment(cid=id_, sid=status_id, rip=rip)
+            comment_reply(cid=id_, sid=status_id, rip=rip)
 
         return JSONResponse({"result": True, "pull_later": False, "message": ""})
     else:  # validation request
@@ -115,4 +126,4 @@ async def check(request: Request) -> bool:
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001)
-    #fake_comment(cid="5031749849974222", sid="5031749803574665", rip="127.0.0.1")
+    # fake_comment(cid="5031749849974222", sid="5031749803574665", rip="127.0.0.1")

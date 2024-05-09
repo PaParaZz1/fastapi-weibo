@@ -103,7 +103,8 @@ class WeiboClient:
         }
         logging.info(f"comment_reply: {data}")
         res = requests.post(url, data=data)
-        logging.info(f"text: {res.text}")
+        if res.status_code != 200:
+            logging.info(f"text: {res.text}")
 
     def comment_create(self, sid: str, rip: str, text: str = None):
         count = 0
@@ -123,7 +124,8 @@ class WeiboClient:
         }
         logging.info(f"comment_create: {data}")
         res = requests.post(url, data=data)
-        logging.info(f"text: {res.text}")
+        if res.status_code != 200:
+            logging.info(f"text: {res.text}")
 
 
 weibo_client = WeiboClient()

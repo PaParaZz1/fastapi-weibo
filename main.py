@@ -140,7 +140,7 @@ async def check(request: Request) -> bool:
     if echostr is None:  # normal request
         rip = request.client.host
         event_type = form.get("event")  # add, repost, del
-        if event_type.toLowerCase() != "add":
+        if event_type.lower() != "add":
             return JSONResponse({"result": True, "pull_later": False, "message": ""})
         content_type = form.get("content_type")  # status, comment
         content_body = form.get("content_body")

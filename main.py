@@ -85,6 +85,12 @@ class WeiboClient:
             time.sleep(10)
 
     def comment_reply(self, cid: str, sid: str, rip: str, text: str = None):
+        count = 0
+        while self.access_token is None:
+            time.sleep(1)
+            count += 1
+            if count >= 100:
+                return
         if text is None:
             text = "已收到评论，飞速运转中..." + str(time.ctime())
         url = "https://api.weibo.com/2/comments/reply.json"
@@ -100,6 +106,12 @@ class WeiboClient:
         logging.info(f"text: {res.text}")
 
     def comment_create(self, sid: str, rip: str, text: str = None):
+        count = 0
+        while self.access_token is None:
+            time.sleep(1)
+            count += 1
+            if count >= 100:
+                return
         if text is None:
             text = "已收到at微博，飞速运转中..." + str(time.ctime())
         url = "https://api.weibo.com/2/comments/create.json"
@@ -128,6 +140,8 @@ async def check(request: Request) -> bool:
     if echostr is None:  # normal request
         rip = request.client.host
         event_type = form.get("event")  # add, repost, del
+        if event_type.toLowerCase() != "add":
+            return JSONResponse({"result": True, "pull_later": False, "message": ""})
         content_type = form.get("content_type")  # status, comment
         content_body = form.get("content_body")
         content_body = json.loads(content_body)
@@ -148,7 +162,12 @@ async def check(request: Request) -> bool:
         elif content_type == "comment":
             status_id = content_body.get("status").get("id")
             status_text = content_body.get("status").get("text")
-            logging.info(f"[comment] uid: {uid}, screen_name: {screen_name}, text: {text}, status_id: {status_id}, status_text: {status_text}")
+            has_image = content_body.get("has_image")
+            if has_image:
+                images = content_body.get("images")
+                logging.info(f"[comment] uid: {uid}, screen_name: {screen_name}, text: {text}, status_id: {status_id}, status_text: {status_text}, images: {images}")
+            else:
+                logging.info(f"[comment] uid: {uid}, screen_name: {screen_name}, text: {text}, status_id: {status_id}, status_text: {status_text}")
             weibo_client.comment_reply(cid=id_, sid=status_id, rip=rip)
 
         return JSONResponse({"result": True, "pull_later": False, "message": ""})

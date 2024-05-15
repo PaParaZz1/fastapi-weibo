@@ -129,6 +129,7 @@ class WeiboClient:
 
 
 weibo_client = WeiboClient()
+text_at = "@MBTI分院帽之电子聊愈版"
 
 
 @app.post('/check')
@@ -154,9 +155,12 @@ async def check(request: Request) -> bool:
         uid = content_body.get("user").get("id")
         screen_name = content_body.get("user").get("screen_name")
         if content_type == "status":
+            if text_at not in text:
+                logging.info(f"user own post: {uid}, {screen_name}, {text}")
+                return JSONResponse({"result": True, "pull_later": False, "message": ""})
             has_image = content_body.get("has_image")
-            if has_image:
-                images = content_body.get("images")
+            images = content_body.get("images", [])
+            if has_image and len(images) > 0:
                 logging.info(f"[status] uid: {uid}, screen_name: {screen_name}, text: {text}, images: {images}")
             else:
                 logging.info(f"[status] uid: {uid}, screen_name: {screen_name}, text: {text}")
@@ -165,8 +169,8 @@ async def check(request: Request) -> bool:
             status_id = content_body.get("status").get("id")
             status_text = content_body.get("status").get("text")
             has_image = content_body.get("has_image")
-            if has_image:
-                images = content_body.get("images")
+            images = content_body.get("images", [])
+            if has_image and len(images) > 0:
                 logging.info(f"[comment] uid: {uid}, screen_name: {screen_name}, text: {text}, status_id: {status_id}, status_text: {status_text}, images: {images}")
             else:
                 logging.info(f"[comment] uid: {uid}, screen_name: {screen_name}, text: {text}, status_id: {status_id}, status_text: {status_text}")

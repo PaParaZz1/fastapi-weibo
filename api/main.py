@@ -8,7 +8,7 @@ import json
 import logging
 import hashlib
 import requests
-from llm import call_llm
+from api.llm import call_llm
 
 
 logging.getLogger().setLevel(logging.INFO)

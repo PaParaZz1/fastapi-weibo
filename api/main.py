@@ -8,6 +8,7 @@ import json
 import logging
 import hashlib
 import requests
+from llm import call_llm
 
 
 logging.getLogger().setLevel(logging.INFO)
@@ -200,7 +201,8 @@ async def check(request: Request) -> bool:
                 logging.info(f"[status] uid: {uid}, screen_name: {screen_name}, text: {text}, images: {images}")
             else:
                 logging.info(f"[status] uid: {uid}, screen_name: {screen_name}, text: {text}")
-            weibo_client.comment_create(sid=id_, rip=rip)
+            llm_text = call_llm(text)
+            weibo_client.comment_create(sid=id_, rip=rip, text=llm_text)
         elif content_type == "comment":
             status_id = content_body.get("status").get("id")
             status_text = content_body.get("status").get("text")
@@ -210,7 +212,8 @@ async def check(request: Request) -> bool:
                 logging.info(f"[comment] uid: {uid}, screen_name: {screen_name}, text: {text}, status_id: {status_id}, status_text: {status_text}, images: {images}")
             else:
                 logging.info(f"[comment] uid: {uid}, screen_name: {screen_name}, text: {text}, status_id: {status_id}, status_text: {status_text}")
-            weibo_client.comment_reply(cid=id_, sid=status_id, rip=rip)
+            llm_text = call_llm(text)
+            weibo_client.comment_reply(cid=id_, sid=status_id, rip=rip, text=llm_text)
 
         return JSONResponse({"result": True, "pull_later": False, "message": ""})
     else:  # validation request

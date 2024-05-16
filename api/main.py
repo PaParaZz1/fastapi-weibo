@@ -202,7 +202,8 @@ async def check(request: Request) -> bool:
             else:
                 logging.info(f"[status] uid: {uid}, screen_name: {screen_name}, text: {text}")
             llm_text = call_llm(text)
-            weibo_client.comment_create(sid=id_, rip=rip, text=llm_text)
+            for i in range(0, len(llm_text), 135):
+                weibo_client.comment_create(sid=id_, rip=rip, text=llm_text[i:i+135])
         elif content_type == "comment":
             status_id = content_body.get("status").get("id")
             status_text = content_body.get("status").get("text")
@@ -213,7 +214,8 @@ async def check(request: Request) -> bool:
             else:
                 logging.info(f"[comment] uid: {uid}, screen_name: {screen_name}, text: {text}, status_id: {status_id}, status_text: {status_text}")
             llm_text = call_llm(text)
-            weibo_client.comment_reply(cid=id_, sid=status_id, rip=rip, text=llm_text)
+            for i in range(0, len(llm_text), 135):
+                weibo_client.comment_reply(cid=id_, sid=status_id, rip=rip, text=llm_text[i:i+135])
 
         return JSONResponse({"result": True, "pull_later": False, "message": ""})
     else:  # validation request

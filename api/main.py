@@ -1,8 +1,9 @@
 from typing import Tuple
 from fastapi import FastAPI, Request, __version__
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, Response, JSONResponse
+from fastapi.responses import HTMLResponse, Response, JSONResponse, PlainTextResponse
 import os
+import re
 import time
 import json
 import logging
@@ -208,6 +209,27 @@ def check_repeat_comment(id_, sid):
         return True
 
 
+def split_string_from_symbol(input_string):
+    input_list = re.split(r'(，|。|；)', input_string)
+
+    input_list = [input_list[i] for i in range(len(input_list)) if input_list[i]]  # 移除空字符串
+    input_list = [input_list[i] + input_list[i+1] for i in range(0, len(input_list), 2)]  # 合并元素
+
+    formatted_string_list = []
+    formatted_string = ''
+    for s in input_list:
+        if len(s) + len(formatted_string) > 140:
+            formatted_string_list.append(formatted_string)
+            formatted_string = s
+        else:
+            formatted_string += s
+
+    if len(formatted_string) > 0:
+        formatted_string_list.append(formatted_string)
+
+    return formatted_string_list
+
+
 @app.post('/upload')
 async def upload(image_url: str) -> str:
     url = "https://api.weibo.com/2/statuses/upload_pic.json"
@@ -260,8 +282,9 @@ async def check(request: Request) -> bool:
 
             def _task():
                 llm_text = call_llm(text)
-                for i in range(0, len(llm_text), 138):
-                    weibo_client.comment_create(sid=id_, rip=rip, text=llm_text[i:i+138])
+                formatted_text = split_string_from_symbol(llm_text)
+                for t in formatted_text:
+                    weibo_client.comment_create(sid=id_, rip=rip, text=t)
 
             task = asyncio.create_task(async_task(_task))
             all_tasks.put_nowait(task)
@@ -280,8 +303,9 @@ async def check(request: Request) -> bool:
 
             def _task():
                 llm_text = call_llm(text)
-                for i in range(0, len(llm_text), 138):
-                    weibo_client.comment_reply(cid=id_, sid=status_id, rip=rip, text=llm_text[i:i+138])
+                formatted_text = split_string_from_symbol(llm_text)
+                for t in formatted_text:
+                    weibo_client.comment_create(sid=id_, rip=rip, text=t)
 
             task = asyncio.create_task(async_task(_task))
             all_tasks.put_nowait(task)
@@ -293,10 +317,10 @@ async def check(request: Request) -> bool:
         cat_string = ''.join(sorted([timestamp, nonce, token]))
         if hashlib.sha1(cat_string.encode()).hexdigest() == signature:
             logging.info(f"check success, echostr: {echostr}")
-            return Response(content=echostr)
+            return PlainTextResponse(content=echostr)
         else:
             logging.error("check failed")
-            return Response(content='', status_code=403)
+            return PlainTextResponse(content='', status_code=403)
 
 
 @app.on_event("shutdown")

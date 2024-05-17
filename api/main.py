@@ -212,8 +212,13 @@ def check_repeat_comment(id_, sid):
 def split_string_from_symbol(input_string):
     input_list = re.split(r'(，|。|；)', input_string)
 
-    input_list = [input_list[i] for i in range(len(input_list)) if input_list[i]]  # 移除空字符串
-    input_list = [input_list[i] + input_list[i+1] for i in range(0, len(input_list), 2)]  # 合并元素
+    input_list = [input_list[i] for i in range(len(input_list)) if input_list[i]]
+    if len(input_list) % 2 == 0:
+        input_list = [input_list[i] + input_list[i+1] for i in range(0, len(input_list), 2)]
+    else:
+        last = input_list[len(input_list) - 1]
+        input_list = [input_list[i] + input_list[i+1] for i in range(0, len(input_list) - 1, 2)]
+        input_list.append(last)
 
     formatted_string_list = []
     formatted_string = ''

@@ -251,8 +251,10 @@ async def check(request: Request) -> bool:
 @app.on_event("shutdown")
 async def shutdown_event():
     while not all_tasks.empty():
+        logging.info(f"begin wait {time.ctime()}")
         task = all_tasks.get_nowait()
         await task
+        logging.info(f"end wait {time.ctime()}")
 
 
 if __name__ == "__main__":

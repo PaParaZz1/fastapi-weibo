@@ -310,7 +310,7 @@ async def check(request: Request) -> bool:
                 llm_text = call_llm(text)
                 formatted_text = split_string_from_symbol(llm_text)
                 for t in formatted_text:
-                    weibo_client.comment_create(sid=id_, rip=rip, text=t)
+                    weibo_client.comment_reply(cid=id_, sid=status_id, rip=rip, text=t)
 
             task = asyncio.create_task(async_task(_task))
             all_tasks.put_nowait(task)

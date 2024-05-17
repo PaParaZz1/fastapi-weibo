@@ -189,6 +189,25 @@ async def async_task(fn):
     return True
 
 
+def check_repeat_status(id_: str):
+    data = kv.get(id_)
+    if data is None:
+        kv.set(id_, 'is_processing')
+        return False
+    else:
+        return True
+
+
+def check_repeat_comment(id_, sid):
+    key = id_ + sid
+    data = kv.get(key)
+    if data is None:
+        kv.set(key, 'is_processing')
+        return False
+    else:
+        return True
+
+
 @app.post('/upload')
 async def upload(image_url: str) -> str:
     url = "https://api.weibo.com/2/statuses/upload_pic.json"
@@ -230,6 +249,8 @@ async def check(request: Request) -> bool:
             if text_at not in text:
                 logging.info(f"user own post: {uid}, {screen_name}, {text}")
                 return JSONResponse({"result": True, "pull_later": False, "message": ""})
+            if check_repeat_status(id_):
+                return JSONResponse({"result": True, "pull_later": False, "message": ""})
             has_image = content_body.get("has_image")
             images = content_body.get("images", [])
             if has_image and len(images) > 0:
@@ -237,15 +258,21 @@ async def check(request: Request) -> bool:
             else:
                 logging.info(f"[status] uid: {uid}, screen_name: {screen_name}, text: {text}")
 
-            llm_text = call_llm(text)
-            for i in range(0, len(llm_text), 138):
-                weibo_client.comment_create(sid=id_, rip=rip, text=llm_text[i:i+138])
+            def _task():
+                llm_text = call_llm(text)
+                for i in range(0, len(llm_text), 138):
+                    weibo_client.comment_create(sid=id_, rip=rip, text=llm_text[i:i+138])
+
+            task = asyncio.create_task(async_task(_task))
+            all_tasks.put_nowait(task)
 
         elif content_type == "comment":
             status_id = content_body.get("status").get("id")
             status_text = content_body.get("status").get("text")
             has_image = content_body.get("has_image")
             images = content_body.get("images", [])
+            if check_repeat_comment(id_, status_id):
+                return JSONResponse({"result": True, "pull_later": False, "message": ""})
             if has_image and len(images) > 0:
                 logging.info(f"[comment] uid: {uid}, screen_name: {screen_name}, text: {text}, status_id: {status_id}, status_text: {status_text}, images: {images}")
             else:

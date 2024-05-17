@@ -57,7 +57,9 @@ class WeiboClient:
         self.retry = 3
 
     def check_token(self) -> Tuple[bool, str]:
+        logging.info(f"check token begin")
         access_token = kv.get("access_token")
+        logging.info(f"check token end {access_token}")
         if access_token is None:
             return False
         else:
@@ -70,6 +72,7 @@ class WeiboClient:
                 return True, access_token["token"]
 
     def update_token(self) -> str:
+        logging.info(f"begin to update token")
         app_key = os.getenv('APP_KEY')
         app_secret = os.getenv('APP_SECRET')
         uid = os.getenv('DEV_UID')
@@ -234,13 +237,9 @@ async def check(request: Request) -> bool:
             else:
                 logging.info(f"[status] uid: {uid}, screen_name: {screen_name}, text: {text}")
 
-            def _task():
-                llm_text = call_llm(text)
-                for i in range(0, len(llm_text), 135):
-                    weibo_client.comment_create(sid=id_, rip=rip, text=llm_text[i:i+135])
-
-            task = asyncio.create_task(async_task(_task))
-            all_tasks.put_nowait(task)
+            llm_text = call_llm(text)
+            for i in range(0, len(llm_text), 138):
+                weibo_client.comment_create(sid=id_, rip=rip, text=llm_text[i:i+138])
 
         elif content_type == "comment":
             status_id = content_body.get("status").get("id")
@@ -254,8 +253,8 @@ async def check(request: Request) -> bool:
 
             def _task():
                 llm_text = call_llm(text)
-                for i in range(0, len(llm_text), 135):
-                    weibo_client.comment_reply(cid=id_, sid=status_id, rip=rip, text=llm_text[i:i+135])
+                for i in range(0, len(llm_text), 138):
+                    weibo_client.comment_reply(cid=id_, sid=status_id, rip=rip, text=llm_text[i:i+138])
 
             task = asyncio.create_task(async_task(_task))
             all_tasks.put_nowait(task)

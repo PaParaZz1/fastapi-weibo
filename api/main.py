@@ -61,7 +61,7 @@ class WeiboClient:
         access_token = kv.get("access_token")
         logging.info(f"check token end {access_token}")
         if access_token is None:
-            return False
+            return False, None
         else:
             access_token = access_token.replace("'", '"')
             access_token = json.loads(access_token)

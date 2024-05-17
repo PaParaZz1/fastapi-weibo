@@ -1,4 +1,4 @@
-from threading import Thread
+from typing import Tuple
 from fastapi import FastAPI, Request, __version__
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, Response, JSONResponse
@@ -10,12 +10,14 @@ import hashlib
 import requests
 import asyncio
 from api.llm import call_llm
+from api.kv import KV
 
 
 logging.getLogger().setLevel(logging.INFO)
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 all_tasks = asyncio.Queue()
+kv = KV()
 token = os.getenv("WEIBO_TOKEN")
 
 html = f"""
@@ -41,7 +43,7 @@ html = f"""
 
 @app.get("/")
 async def root():
-    #return HTMLResponse(html)
+    # return HTMLResponse(html)
     return HTMLResponse(status_code=404, content="Not Found")
 
 
@@ -52,14 +54,22 @@ async def hello():
 
 class WeiboClient:
     def __init__(self):
-        self.access_token = os.getenv("WEIBO_ACCESS_TOKEN")
-        if self.access_token is None:
-            self.last_update_time = 0
-            self.update_token_thread = Thread(target=self.update_token, daemon=True)
-            self.update_token_thread.start()
+        self.retry = 3
 
-    def update_token(self):
-        logging.info("update token thread start")
+    def check_token(self) -> Tuple[bool, str]:
+        access_token = kv.get("access_token")
+        if access_token is None:
+            return False
+        else:
+            access_token = access_token.replace("'", '"')
+            access_token = json.loads(access_token)
+            if (time.time() - access_token["created_at"]) >= 60:
+                logging.info(f"need to update token: {access_token}")
+                return False, None
+            else:
+                return True, access_token["token"]
+
+    def update_token(self) -> str:
         app_key = os.getenv('APP_KEY')
         app_secret = os.getenv('APP_SECRET')
         uid = os.getenv('DEV_UID')
@@ -68,39 +78,39 @@ class WeiboClient:
         assert uid is not None
         md5_hash = hashlib.md5()
 
-        while True:
-            if time.time() - self.last_update_time >= 4800:
-                current_time_sec = time.time()
-                timestamp = str(int(round(current_time_sec * 1000)))
-                data = {
-                    'client_id': app_key,
-                    'timestamp': timestamp,
-                    'nonce': 'eqiojronqnr',
-                }
-                sign = '&'.join([data['client_id'], uid, data['timestamp'], data['nonce'], app_secret])
-                md5_hash.update(sign.encode())
-                data['sign'] = md5_hash.hexdigest()
-                logging.info(f'update_token: {data}, uid: {uid}')
-                url = 'https://api.weibo.com/oauth2/vp/authorize?client_id=' + data['client_id'] + '&timestamp=' + data['timestamp'] + '&nonce=' + data['nonce'] + '&sign=' + data['sign']
-                response = requests.get(url)
-                data = response.json()
-                self.access_token = data.get("access_token")
-                self.last_update_time = time.time()
-                logging.info("update token success")
-            time.sleep(10)
+        current_time_sec = time.time()
+        timestamp = str(int(round(current_time_sec * 1000)))
+        data = {
+            'client_id': app_key,
+            'timestamp': timestamp,
+            'nonce': 'eqiojronqnr',
+        }
+        sign = '&'.join([data['client_id'], uid, data['timestamp'], data['nonce'], app_secret])
+        md5_hash.update(sign.encode())
+        data['sign'] = md5_hash.hexdigest()
+        logging.info(f'update_token: {data}, uid: {uid}')
+        url = 'https://api.weibo.com/oauth2/vp/authorize?client_id=' + data['client_id'] + '&timestamp=' + data['timestamp'] + '&nonce=' + data['nonce'] + '&sign=' + data['sign']
+        response = requests.get(url)
+        data = response.json()
+        access_token = data.get("access_token")
+        kv.set("access_token", {"token": access_token, "created_at": current_time_sec})
+        logging.info("update token success")
+        return access_token
+
+    def _get_access_token(self):
+        flag, access_token = self.check_token()
+        if flag:
+            return access_token
+        else:
+            return self.update_token()
 
     def comment_reply(self, cid: str, sid: str, rip: str, text: str = None, image_url: str = None):
-        count = 0
-        while self.access_token is None:
-            time.sleep(1)
-            count += 1
-            if count >= 100:
-                return
+        access_token = self._get_access_token()
         if text is None:
             text = "已收到评论，飞速运转中..." + str(time.ctime())
         url = "https://api.weibo.com/2/comments/reply.json"
         data = {
-            "access_token": self.access_token,
+            "access_token": access_token,
             "cid": cid,
             "id": sid,
             "comment": text,
@@ -109,23 +119,25 @@ class WeiboClient:
         if image_url is not None:
             pic_ids = image_url.split("/")[-1].split(".")[0]
             data["pic_ids"] = pic_ids
-        logging.info(f"comment_reply: {data}")
-        res = requests.post(url, data=data)
-        if res.status_code != 200:
-            logging.info(f"text: {res.text} token: {self.access_token}")
+        for _ in range(self.retry):
+            logging.info(f"comment_reply: {data}")
+            res = requests.post(url, data=data)
+            if res.status_code != 200:
+                error_text = res.text
+                logging.info(f"text: {error_text} token: {access_token}")
+                error_data = json.loads(error_text)
+                if error_data["error_code"] == 21332:
+                    data["access_token"] = self.update_token()
+            else:
+                break
 
     def comment_create(self, sid: str, rip: str, text: str = None, image_url: str = None):
-        count = 0
-        while self.access_token is None:
-            time.sleep(1)
-            count += 1
-            if count >= 100:
-                return
+        access_token = self._get_access_token()
         if text is None:
             text = "已收到at微博，飞速运转中..." + str(time.ctime())
         url = "https://api.weibo.com/2/comments/create.json"
         data = {
-            "access_token": self.access_token,
+            "access_token": access_token,
             "id": sid,
             "comment": text,
             "rip": rip,
@@ -133,23 +145,36 @@ class WeiboClient:
         if image_url is not None:
             pic_ids = image_url.split("/")[-1].split(".")[0]
             data["pic_ids"] = pic_ids
-        logging.info(f"comment_create: {data}")
-        res = requests.post(url, data=data)
-        if res.status_code != 200:
-            logging.info(f"text: {res.text} token: {self.access_token}")
+        for _ in range(self.retry):
+            logging.info(f"comment_create: {data}")
+            res = requests.post(url, data=data)
+            if res.status_code != 200:
+                error_text = res.text
+                logging.info(f"text: {error_text} token: {access_token}")
+                error_data = json.loads(error_text)
+                if error_data["error_code"] == 21332:
+                    data["access_token"] = self.update_token()
+            else:
+                break
 
     def upload_image(self, image_url: str):
+        access_token = self._get_access_token()
         url = "https://api.weibo.com/2/statuses/upload_pic.json"
         files = {
             "pic": requests.get(image_url).content,
-            "access_token": (None, self.access_token),
+            "access_token": (None, access_token),
         }
-        logging.info(f"upload_image: {image_url}")
-        res = requests.post(url, files=files)
-        if res.status_code != 200:
-            logging.info(f"text: {res.text} token: {self.access_token}")
-        else:
-            return res.json().get("bmiddle_pic")
+        for _ in range(self.retry):
+            logging.info(f"upload_image: {image_url}")
+            res = requests.post(url, files=files)
+            if res.status_code != 200:
+                error_text = res.text
+                logging.info(f"text: {error_text} token: {access_token}")
+                error_data = json.loads(error_text)
+                if error_data["error_code"] == 21332:
+                    files["access_token"] = self.update_token()
+            else:
+                return res.json().get("bmiddle_pic")
 
 
 weibo_client = WeiboClient()

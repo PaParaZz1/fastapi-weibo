@@ -42,7 +42,6 @@ class KV:
             self.kv_config = kv_config
 
     def has_auth(self) -> bool:
-        kv_config = self.kv_config
         headers = {
             'Authorization': f'Bearer {self.kv_config.rest_api_token}',
         }

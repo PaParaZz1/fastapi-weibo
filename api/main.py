@@ -8,12 +8,14 @@ import json
 import logging
 import hashlib
 import requests
+import asyncio
 from api.llm import call_llm
 
 
 logging.getLogger().setLevel(logging.INFO)
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
+all_tasks = asyncio.Queue()
 token = os.getenv("WEIBO_TOKEN")
 
 html = f"""
@@ -154,6 +156,11 @@ weibo_client = WeiboClient()
 text_at = "@MBTI分院帽之电子聊愈版"
 
 
+async def async_task(fn):
+    fn()
+    return True
+
+
 @app.post('/upload')
 async def upload(image_url: str) -> str:
     url = "https://api.weibo.com/2/statuses/upload_pic.json"
@@ -201,9 +208,15 @@ async def check(request: Request) -> bool:
                 logging.info(f"[status] uid: {uid}, screen_name: {screen_name}, text: {text}, images: {images}")
             else:
                 logging.info(f"[status] uid: {uid}, screen_name: {screen_name}, text: {text}")
-            llm_text = call_llm(text)
-            for i in range(0, len(llm_text), 135):
-                weibo_client.comment_create(sid=id_, rip=rip, text=llm_text[i:i+135])
+
+            def _task():
+                llm_text = call_llm(text)
+                for i in range(0, len(llm_text), 135):
+                    weibo_client.comment_create(sid=id_, rip=rip, text=llm_text[i:i+135])
+
+            task = asyncio.create_task(async_task(_task))
+            all_tasks.put_nowait(task)
+
         elif content_type == "comment":
             status_id = content_body.get("status").get("id")
             status_text = content_body.get("status").get("text")
@@ -213,9 +226,14 @@ async def check(request: Request) -> bool:
                 logging.info(f"[comment] uid: {uid}, screen_name: {screen_name}, text: {text}, status_id: {status_id}, status_text: {status_text}, images: {images}")
             else:
                 logging.info(f"[comment] uid: {uid}, screen_name: {screen_name}, text: {text}, status_id: {status_id}, status_text: {status_text}")
-            llm_text = call_llm(text)
-            for i in range(0, len(llm_text), 135):
-                weibo_client.comment_reply(cid=id_, sid=status_id, rip=rip, text=llm_text[i:i+135])
+
+            def _task():
+                llm_text = call_llm(text)
+                for i in range(0, len(llm_text), 135):
+                    weibo_client.comment_reply(cid=id_, sid=status_id, rip=rip, text=llm_text[i:i+135])
+
+            task = asyncio.create_task(async_task(_task))
+            all_tasks.put_nowait(task)
 
         return JSONResponse({"result": True, "pull_later": False, "message": ""})
     else:  # validation request
@@ -228,6 +246,13 @@ async def check(request: Request) -> bool:
         else:
             logging.error("check failed")
             return Response(content='', status_code=403)
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    while not all_tasks.empty():
+        task = all_tasks.get_nowait()
+        await task
 
 
 if __name__ == "__main__":

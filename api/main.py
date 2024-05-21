@@ -183,6 +183,8 @@ class WeiboClient:
 
 weibo_client = WeiboClient()
 text_at = "@MBTI分院帽之电子聊愈版"
+text_analysis = "微博分析AI"
+text_analysi_prefix = "请你根据下列博文进行MBTI相关的分析："
 
 
 async def async_task(fn):
@@ -305,6 +307,8 @@ async def check(request: Request) -> bool:
                 logging.info(f"[comment] uid: {uid}, screen_name: {screen_name}, text: {text}, status_id: {status_id}, status_text: {status_text}, images: {images}")
             else:
                 logging.info(f"[comment] uid: {uid}, screen_name: {screen_name}, text: {text}, status_id: {status_id}, status_text: {status_text}")
+            if text_analysis in text:
+                text = text_analysi_prefix + status_text
 
             def _task():
                 llm_text = call_llm(text)

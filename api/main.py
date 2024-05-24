@@ -1,7 +1,7 @@
 from typing import Tuple
 from fastapi import FastAPI, Request, __version__
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, Response, JSONResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 import os
 import re
 import time
@@ -45,11 +45,13 @@ html = f"""
 @app.get("/")
 async def root():
     # return HTMLResponse(html)
+    # set 404 for the root path to ensure the safety
     return HTMLResponse(status_code=404, content="Not Found")
 
 
 @app.get('/ping')
 async def hello():
+    # naive health check
     return {'res': 'pong', 'version': __version__, "time": time.time()}
 
 
@@ -58,14 +60,18 @@ class WeiboClient:
         self.retry = 3
 
     def check_token(self) -> Tuple[bool, str]:
-        logging.info(f"check token begin")
+        """
+        Check if the token is set and not expired, if so, return True and the token, otherwise return False and None
+        """
+        logging.info("check token begin")
         access_token = kv.get("access_token")
-        logging.info(f"check token end {access_token}")
+        logging.info("check token end {access_token}")
         if access_token is None:
             return False, None
         else:
             access_token = access_token.replace("'", '"')
             access_token = json.loads(access_token)
+            # 60 is the update time for the token, the expire time of the token defined by weibo is 2 hour
             if (time.time() - access_token["created_at"]) >= 60:
                 logging.info(f"need to update token: {access_token}")
                 return False, None
@@ -73,7 +79,10 @@ class WeiboClient:
                 return True, access_token["token"]
 
     def update_token(self) -> str:
-        logging.info(f"begin to update token")
+        """
+        update token with the special weibo api for bot
+        """
+        logging.info("begin to update token")
         app_key = os.getenv('APP_KEY')
         app_secret = os.getenv('APP_SECRET')
         uid = os.getenv('DEV_UID')
@@ -120,9 +129,15 @@ class WeiboClient:
             "comment": text,
             "rip": rip,
         }
+        # if indicated image_url is None, use the bottom image (qr code) as the default image
         if image_url is not None:
+            # weibo image_url example: https://wx1.sinaimg.cn/large/0072Vf1pgy1gq1z1z1z1rj30u00u0q4f.jpg
             pic_ids = image_url.split("/")[-1].split(".")[0]
             data["pic_ids"] = pic_ids
+        else:
+            data["pic_ids"] = self.bottom_image_weibo_pic_ids
+
+        # retry `self.retry` times if the status code is not 200 (network error or expired token)
         for _ in range(self.retry):
             logging.info(f"comment_reply: {data}")
             res = requests.post(url, data=data)
@@ -130,6 +145,7 @@ class WeiboClient:
                 error_text = res.text
                 logging.info(f"text: {error_text} token: {access_token}")
                 error_data = json.loads(error_text)
+                # 21332 means the token is expired
                 if error_data["error_code"] == 21332:
                     data["access_token"] = self.update_token()
             else:
@@ -146,9 +162,14 @@ class WeiboClient:
             "comment": text,
             "rip": rip,
         }
+        # if indicated image_url is None, use the bottom image (qr code) as the default image
         if image_url is not None:
+            # weibo image_url example: https://wx1.sinaimg.cn/large/0072Vf1pgy1gq1z1z1z1rj30u00u0q4f.jpg
             pic_ids = image_url.split("/")[-1].split(".")[0]
             data["pic_ids"] = pic_ids
+        else:
+            data["pic_ids"] = self.bottom_image_weibo_pic_ids
+        # retry `self.retry` times if the status code is not 200 (network error or expired token)
         for _ in range(self.retry):
             logging.info(f"comment_create: {data}")
             res = requests.post(url, data=data)
@@ -156,6 +177,7 @@ class WeiboClient:
                 error_text = res.text
                 logging.info(f"text: {error_text} token: {access_token}")
                 error_data = json.loads(error_text)
+                # 21332 means the token is expired
                 if error_data["error_code"] == 21332:
                     data["access_token"] = self.update_token()
             else:
@@ -168,6 +190,7 @@ class WeiboClient:
             "pic": requests.get(image_url).content,
             "access_token": (None, access_token),
         }
+        # retry `self.retry` times if the status code is not 200 (network error or expired token)
         for _ in range(self.retry):
             logging.info(f"upload_image: {image_url}")
             res = requests.post(url, files=files)
@@ -175,10 +198,12 @@ class WeiboClient:
                 error_text = res.text
                 logging.info(f"text: {error_text} token: {access_token}")
                 error_data = json.loads(error_text)
+                # 21332 means the token is expired
                 if error_data["error_code"] == 21332:
                     files["access_token"] = self.update_token()
             else:
-                return res.json().get("bmiddle_pic")
+                # return res.json().get("bmiddle_pic")
+                return res.json().get("original_pic")  # original_pic is the highest resolution
 
 
 weibo_client = WeiboClient()
@@ -187,12 +212,31 @@ text_analysis = "微博分析ai"
 text_analysi_prefix = "请你根据下列博文进行MBTI相关的分析："
 
 
+def get_client_real_ip(r: Request):
+    """
+    Get the real ip of the client in the production environment
+    """
+    ip = r.headers.get("X-Real-Ip")
+    if ip:
+        return ip
+    ip = r.headers.get("X-Forwarded-For")
+    if ip:
+        return ip
+    if ":" in r.remote_addr:
+        return r.remote_addr.split(":")[0]
+    return r.remote_addr
+
+
 async def async_task(fn):
     fn()
     return True
 
 
 def check_repeat_status(id_: str):
+    """
+    Sometimes weibo will repeatedly push the data if it not received the response in time (about 5s)
+    Check whether the status is already processing
+    """
     data = kv.get(id_)
     if data is None:
         kv.set(id_, 'is_processing')
@@ -202,6 +246,10 @@ def check_repeat_status(id_: str):
 
 
 def check_repeat_comment(id_, sid):
+    """
+    Sometimes weibo will repeatedly push the data if it not received the response in time (about 5s)
+    Check whether the comment is already processing
+    """
     key = id_ + sid
     data = kv.get(key)
     if data is None:
@@ -239,6 +287,9 @@ def split_string_from_symbol(input_string):
 
 @app.post('/upload')
 async def upload(image_url: str) -> str:
+    """
+    Debug endpoint for the image upload
+    """
     url = "https://api.weibo.com/2/statuses/upload_pic.json"
     files = {
         "pic": requests.get(image_url).content,
@@ -254,12 +305,17 @@ async def upload(image_url: str) -> str:
 
 @app.post('/check')
 async def check(request: Request) -> bool:
+    """
+    Main endpoint for the weibo
+    """
     # application/x-www-form-urlencoded
     # body = await request.body()
     form = await request.form()
     timestamp = form.get("timestamp")
     signature = form.get("signature")
     echostr = form.get("echostr")
+
+    # response for the normal weibo data push
     if echostr is None:  # normal request
         rip = request.client.host
         event_type = form.get("event")  # add, repost, del
@@ -271,7 +327,6 @@ async def check(request: Request) -> bool:
 
         id_ = content_body.get("id")
         text = content_body.get("text")
-        created_at = content_body.get("created_at")
         uid = content_body.get("user").get("id")
         screen_name = content_body.get("user").get("screen_name")
         if content_type == "status":
@@ -320,7 +375,8 @@ async def check(request: Request) -> bool:
             all_tasks.put_nowait(task)
 
         return JSONResponse({"result": True, "pull_later": False, "message": ""})
-    else:  # validation request
+    # response for the weibo validation request
+    else:
         nonce = form.get("nonce")
         logging.info(f"nonce: {nonce}, timestamp: {timestamp}, echostr: {echostr}, signature: {signature}")
         cat_string = ''.join(sorted([timestamp, nonce, token]))
@@ -344,4 +400,3 @@ async def shutdown_event():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001)
-    # fake_comment(cid="5031749849974222", sid="5031749803574665", rip="127.0.0.1")

@@ -206,7 +206,8 @@ weibo_client = WeiboClient()
 text_at = "@MBTI分院帽之电子聊愈版"
 text_analysis = "微博分析ai"
 text_analysis_prefix = "请你根据下列博文进行MBTI相关的分析："
-text_img = "请你结合下面的图片描述进行MBTI相关的分析，以下是图片描述信息："
+text_img = "请你结合下面的图片描述回答用户的问题，以下是图片描述信息："
+text_img = "\n以下是用户的问题："
 
 
 def get_client_real_ip(r: Request):
@@ -353,7 +354,7 @@ async def check(request: Request) -> bool:
             if has_image and len(images) > 0:
                 img_text = get_vlm_result(images[0])
                 if img_text is not None:
-                    text = text_img + img_text + text
+                    text = text_img + img_text + text_img2 + text
                     logging.info(f"[comment img]: {img_text}")
                 logging.info(f"[status] uid: {uid}, screen_name: {screen_name}, text: {text}, images: {images}")
             else:
@@ -378,7 +379,7 @@ async def check(request: Request) -> bool:
             if has_image and len(images) > 0:
                 img_text = get_vlm_result(images[0])
                 if img_text is not None:
-                    text = text_img + img_text + text
+                    text = text_img + img_text + text_img2 + text
                     logging.info(f"[comment img]: {img_text}")
                 logging.info(f"[comment] uid: {uid}, screen_name: {screen_name}, text: {text}, status_id: {status_id}, status_text: {status_text}, images: {images}")
             else:

@@ -134,8 +134,6 @@ class WeiboClient:
             # weibo image_url example: https://wx1.sinaimg.cn/large/0072Vf1pgy1gq1z1z1z1rj30u00u0q4f.jpg
             pic_ids = image_url.split("/")[-1].split(".")[0]
             data["pic_ids"] = pic_ids
-        else:
-            data["pic_ids"] = self.bottom_image_weibo_pic_ids
 
         # retry `self.retry` times if the status code is not 200 (network error or expired token)
         for _ in range(self.retry):
@@ -167,8 +165,6 @@ class WeiboClient:
             # weibo image_url example: https://wx1.sinaimg.cn/large/0072Vf1pgy1gq1z1z1z1rj30u00u0q4f.jpg
             pic_ids = image_url.split("/")[-1].split(".")[0]
             data["pic_ids"] = pic_ids
-        else:
-            data["pic_ids"] = self.bottom_image_weibo_pic_ids
         # retry `self.retry` times if the status code is not 200 (network error or expired token)
         for _ in range(self.retry):
             logging.info(f"comment_create: {data}")
@@ -371,9 +367,8 @@ async def check(request: Request) -> bool:
                 for t in formatted_text:
                     weibo_client.comment_reply(cid=id_, sid=status_id, rip=rip, text=t)
 
-            #task = asyncio.create_task(async_task(_task))
-            #all_tasks.put_nowait(task)
-            _task()
+            task = asyncio.create_task(async_task(_task))
+            all_tasks.put_nowait(task)
 
         return JSONResponse({"result": True, "pull_later": False, "message": ""})
     # response for the weibo validation request

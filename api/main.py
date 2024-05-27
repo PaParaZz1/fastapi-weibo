@@ -207,7 +207,7 @@ text_at = "@MBTI分院帽之电子聊愈版"
 text_analysis = "微博分析ai"
 text_analysis_prefix = "请你根据下列博文进行MBTI相关的分析："
 text_img = "请你结合下面的图片描述回答用户的问题，以下是图片描述信息："
-text_img = "\n以下是用户的问题："
+text_img2 = "\n以下是用户的问题："
 
 
 def get_client_real_ip(r: Request):

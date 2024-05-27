@@ -65,7 +65,7 @@ class WeiboClient:
         """
         logging.info("check token begin")
         access_token = kv.get("access_token")
-        logging.info("check token end {access_token}")
+        logging.info(f"check token end {access_token}")
         if access_token is None:
             return False, None
         else:
@@ -371,8 +371,9 @@ async def check(request: Request) -> bool:
                 for t in formatted_text:
                     weibo_client.comment_reply(cid=id_, sid=status_id, rip=rip, text=t)
 
-            task = asyncio.create_task(async_task(_task))
-            all_tasks.put_nowait(task)
+            #task = asyncio.create_task(async_task(_task))
+            #all_tasks.put_nowait(task)
+            _task()
 
         return JSONResponse({"result": True, "pull_later": False, "message": ""})
     # response for the weibo validation request

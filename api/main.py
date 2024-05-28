@@ -380,6 +380,8 @@ async def check(request: Request) -> bool:
 
             if text_analysis in text.lower():
                 text = text_analysis_prefix + status_text
+                has_image = content_body.get("status").get("has_image")
+                images = content_body.get("status").get("images", [])
             if has_image and len(images) > 0:
                 img_text = get_vlm_result(images[0], text[:140])
                 if img_text is not None:

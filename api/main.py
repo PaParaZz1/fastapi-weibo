@@ -210,6 +210,14 @@ text_img = "请你结合下面的图片描述回答用户的问题，以下是�
 text_img2 = "\n以下是用户的问题："
 
 
+def emoji_filter(text: str) -> str:
+    """
+    Filter the emoji in the text to avoid misleading the weibo content
+    """
+    pattern = re.compile(r'\[.*?\]')
+    return pattern.sub("", text)
+
+
 def get_client_real_ip(r: Request):
     """
     Get the real ip of the client in the production environment
@@ -258,6 +266,10 @@ def check_repeat_comment(id_, sid):
 
 
 def split_string_from_symbol(input_string):
+    """
+    Split the string from the symbol "，。；" and keep the symbol in the string.
+    Each weibo comment should be less than 140 characters
+    """
     input_list = re.split(r'(，|。|；)', input_string)
 
     input_list = [input_list[i] for i in range(len(input_list)) if input_list[i]]
@@ -284,6 +296,9 @@ def split_string_from_symbol(input_string):
 
 
 def get_vlm_result(image_url: str, prompt: str) -> str:
+    """
+    Call the VLM model to generate the text description from the image
+    """
     url = os.getenv("VLM_BACKEND_ENDPOINT")
     data = {
         "image_url": image_url,
@@ -360,6 +375,7 @@ async def check(request: Request) -> bool:
                 logging.info(f"[status] uid: {uid}, screen_name: {screen_name}, text: {text}, images: {images}")
             else:
                 logging.info(f"[status] uid: {uid}, screen_name: {screen_name}, text: {text}")
+            text = emoji_filter(text)
 
             def _task():
                 llm_text = call_llm(text)
@@ -378,18 +394,31 @@ async def check(request: Request) -> bool:
             if check_repeat_comment(id_, status_id):
                 return JSONResponse({"result": True, "pull_later": False, "message": ""})
 
+            text = emoji_filter(text)
             if text_analysis in text.lower():
-                text = text_analysis_prefix + status_text
                 has_image = content_body.get("status").get("has_image")
                 images = content_body.get("status").get("images", [])
-            if has_image and len(images) > 0:
-                img_text = get_vlm_result(images[0], text[:140])
-                if img_text is not None:
-                    text = text_img + img_text + text_img2 + text
-                    logging.info(f"[comment img]: {img_text}")
-                logging.info(f"[comment] uid: {uid}, screen_name: {screen_name}, text: {text}, status_id: {status_id}, status_text: {status_text}, images: {images}")
+                status_text = emoji_filter(status_text)
+                if has_image and len(images) > 0:
+                    img_text = get_vlm_result(images[0], status_text[:140])
+                    if img_text is not None:
+                        text = text_img + img_text + text_img2 + text
+                        logging.info(f"[comment ana img]: {img_text}")
+                    else:
+                        text = text_analysis_prefix + status_text
+                    logging.info(f"[comment ana] uid: {uid}, screen_name: {screen_name}, text: {text}, status_id: {status_id}, status_text: {status_text}, images: {images}")
+                else:
+                    text = text_analysis_prefix + status_text
+                    logging.info(f"[comment ana] uid: {uid}, screen_name: {screen_name}, text: {text}, status_id: {status_id}, status_text: {status_text}")
             else:
-                logging.info(f"[comment] uid: {uid}, screen_name: {screen_name}, text: {text}, status_id: {status_id}, status_text: {status_text}")
+                if has_image and len(images) > 0:
+                    img_text = get_vlm_result(images[0], text[:140])
+                    if img_text is not None:
+                        text = text_img + img_text + text_img2 + text
+                        logging.info(f"[comment img]: {img_text}")
+                    logging.info(f"[comment] uid: {uid}, screen_name: {screen_name}, text: {text}, status_id: {status_id}, status_text: {status_text}, images: {images}")
+                else:
+                    logging.info(f"[comment] uid: {uid}, screen_name: {screen_name}, text: {text}, status_id: {status_id}, status_text: {status_text}")
 
             def _task():
                 llm_text = call_llm(text)

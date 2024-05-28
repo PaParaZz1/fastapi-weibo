@@ -283,10 +283,11 @@ def split_string_from_symbol(input_string):
     return formatted_string_list
 
 
-def get_vlm_result(image_url: str) -> str:
+def get_vlm_result(image_url: str, prompt: str) -> str:
     url = os.getenv("VLM_BACKEND_ENDPOINT")
     data = {
-        "image_url": image_url
+        "image_url": image_url,
+        "prompt": prompt,
     }
     headers = {
         "Content-Type": "application/json"
@@ -352,7 +353,7 @@ async def check(request: Request) -> bool:
             has_image = content_body.get("has_image")
             images = content_body.get("images", [])
             if has_image and len(images) > 0:
-                img_text = get_vlm_result(images[0])
+                img_text = get_vlm_result(images[0], text[:140])
                 if img_text is not None:
                     text = text_img + img_text + text_img2 + text
                     logging.info(f"[comment img]: {img_text}")
@@ -376,16 +377,17 @@ async def check(request: Request) -> bool:
             images = content_body.get("images", [])
             if check_repeat_comment(id_, status_id):
                 return JSONResponse({"result": True, "pull_later": False, "message": ""})
+
+            if text_analysis in text.lower():
+                text = text_analysis_prefix + status_text
             if has_image and len(images) > 0:
-                img_text = get_vlm_result(images[0])
+                img_text = get_vlm_result(images[0], text[:140])
                 if img_text is not None:
                     text = text_img + img_text + text_img2 + text
                     logging.info(f"[comment img]: {img_text}")
                 logging.info(f"[comment] uid: {uid}, screen_name: {screen_name}, text: {text}, status_id: {status_id}, status_text: {status_text}, images: {images}")
             else:
                 logging.info(f"[comment] uid: {uid}, screen_name: {screen_name}, text: {text}, status_id: {status_id}, status_text: {status_text}")
-            if text_analysis in text.lower():
-                text = text_analysis_prefix + status_text
 
             def _task():
                 llm_text = call_llm(text)

@@ -315,6 +315,22 @@ def get_vlm_result(image_url: str, prompt: str) -> str:
         return None
 
 
+def check_keyword(text: str, content_body: dict) -> bool:
+    """
+    Check if the text contains the keyword and its content_body is suitable for directly answering.
+    """
+    lower_text = text.lower()
+    keywords = ["mbti测试"]
+    for k in keywords:
+        if k in lower_text:
+            follow_me = content_body.get("user").get("follow_me")
+            verified = content_body.get("user").get("verified")
+            logging.info(f"keyword: {k}, follow_me: {follow_me}, verified: {verified}, text: {text}")
+            if follow_me or verified:
+                return True
+    return False
+
+
 @app.post('/upload')
 async def upload(image_url: str) -> str:
     """
@@ -360,7 +376,7 @@ async def check(request: Request) -> bool:
         uid = content_body.get("user").get("id")
         screen_name = content_body.get("user").get("screen_name")
         if content_type == "status":
-            if text_at not in text:
+            if text_at not in text and not check_keyword(text, content_body):
                 logging.info(f"user own post: {uid}, {screen_name}, {text}")
                 return JSONResponse({"result": True, "pull_later": False, "message": ""})
             if check_repeat_status(id_):

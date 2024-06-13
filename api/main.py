@@ -323,10 +323,11 @@ def check_keyword(text: str, content_body: dict) -> bool:
     keywords = ["mbti测试"]
     for k in keywords:
         if k in lower_text:
+            followers_count = content_body.get("user").get("followers_count")
             follow_me = content_body.get("user").get("follow_me")
             verified = content_body.get("user").get("verified")
             logging.info(f"keyword: {k}, follow_me: {follow_me}, verified: {verified}, text: {text}")
-            if follow_me or verified:
+            if follow_me or verified or (followers_count > 3000 and '小行家' not in text) or ('psydi' in lower_text):
                 return True
     return False
 

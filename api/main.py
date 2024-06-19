@@ -332,6 +332,13 @@ def check_keyword(text: str, content_body: dict) -> bool:
     return False
 
 
+def check_multiple_at(text: str, num: int) -> bool:
+    """
+    Check if the text contains multiple at symbol (@), if the count of at symbol is more than num, return True
+    """
+    return text.count("@") > num
+
+
 @app.post('/upload')
 async def upload(image_url: str) -> str:
     """
@@ -376,6 +383,9 @@ async def check(request: Request) -> bool:
         text = content_body.get("text")
         uid = content_body.get("user").get("id")
         screen_name = content_body.get("user").get("screen_name")
+        if check_multiple_at(text, 3):
+            return JSONResponse({"result": True, "pull_later": False, "message": ""})
+
         if content_type == "status":
             if text_at not in text and not check_keyword(text, content_body):
                 logging.info(f"user own post: {uid}, {screen_name}, {text}")

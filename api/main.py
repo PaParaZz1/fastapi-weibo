@@ -320,7 +320,7 @@ def check_keyword(text: str, content_body: dict) -> bool:
     Check if the text contains the keyword and its content_body is suitable for directly answering.
     """
     lower_text = text.lower()
-    keywords = ["mbti测试"]
+    keywords = ["mbti测试", "i人e人", "p人j人", "mbti meme"]
     for k in keywords:
         if k in lower_text:
             followers_count = content_body.get("user").get("followers_count")
@@ -329,6 +329,11 @@ def check_keyword(text: str, content_body: dict) -> bool:
             logging.info(f"keyword: {k}, follow_me: {follow_me}, verified: {verified}, text: {text}")
             if follow_me or verified or (followers_count > 3000 and '小行家' not in text) or ('psydi' in lower_text):
                 return True
+            if followers_count > 3000 and '小行家' not in lower_text:
+                if 'http' in lower_text or 'mbti十六型人格' in lower_text:
+                    return False
+                else:
+                    return True
     return False
 
 
@@ -387,9 +392,13 @@ async def check(request: Request) -> bool:
             return JSONResponse({"result": True, "pull_later": False, "message": ""})
 
         if content_type == "status":
-            if text_at not in text and not check_keyword(text, content_body):
-                logging.info(f"user own post: {uid}, {screen_name}, {text}")
-                return JSONResponse({"result": True, "pull_later": False, "message": ""})
+
+            if text_at not in text:
+                if check_keyword(text, content_body):
+                    logging.info(f"user own post: {uid}, {screen_name}, {text}")
+                    return JSONResponse({"result": True, "pull_later": False, "message": ""})
+                else:
+                    return JSONResponse({"result": True, "pull_later": False, "message": ""})
             if check_repeat_status(id_):
                 return JSONResponse({"result": True, "pull_later": False, "message": ""})
             has_image = content_body.get("has_image")

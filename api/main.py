@@ -320,7 +320,7 @@ def check_keyword(text: str, content_body: dict) -> bool:
     Check if the text contains the keyword and its content_body is suitable for directly answering.
     """
     lower_text = text.lower()
-    keywords = ["mbti测试", "i人e人", "p人j人", "mbti meme"]
+    keywords = ["mbti测试", "i人e人", "p人j人", "是p人", "是j人", "是i人", "是e人"]
     for k in keywords:
         if k in lower_text:
             followers_count = content_body.get("user").get("followers_count")
@@ -328,7 +328,7 @@ def check_keyword(text: str, content_body: dict) -> bool:
             verified = content_body.get("user").get("verified")
             if follow_me or ('psydi' in lower_text):
                 return True
-            if (verified or followers_count > 3000) and '小行家' not in lower_text:
+            if verified or followers_count > 500:
                 if 'http' in lower_text or 'mbti十六型人格' in lower_text:
                     return False
                 else:
@@ -387,7 +387,7 @@ async def check(request: Request) -> bool:
         text = content_body.get("text")
         uid = content_body.get("user").get("id")
         screen_name = content_body.get("user").get("screen_name")
-        if check_multiple_at(text, 3):
+        if check_multiple_at(text, 3) or "苏新皓" in text:
             return JSONResponse({"result": True, "pull_later": False, "message": ""})
 
         if content_type == "status":

@@ -387,7 +387,7 @@ async def check(request: Request) -> bool:
         text = content_body.get("text")
         uid = content_body.get("user").get("id")
         screen_name = content_body.get("user").get("screen_name")
-        if check_multiple_at(text, 3) or "苏新皓" in text:
+        if check_multiple_at(text, 3) or "苏新皓" in text or "susu福福" in text:
             return JSONResponse({"result": True, "pull_later": False, "message": ""})
 
         if content_type == "status":
